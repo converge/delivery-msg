@@ -10,7 +10,7 @@ Objective: have a functional gRPC API that create delivery orders and track the 
 
 ## Brainstorm
 
-![brainstorm](https://user-images.githubusercontent.com/188671/239596763-68085444-4dde-4cea-ae12-3e5417979934.png)
+![brainstorm](https://user-images.githubusercontent.com/188671/239596772-94425b5d-c089-4968-880d-b27232a0c7ff.png)
 
 ## UI
 
@@ -18,7 +18,7 @@ Objective: have a functional gRPC API that create delivery orders and track the 
 
 ## Architecture
 
-![architecture](https://user-images.githubusercontent.com/188671/239596772-94425b5d-c089-4968-880d-b27232a0c7ff.png)
+![architecture](https://user-images.githubusercontent.com/188671/239596763-68085444-4dde-4cea-ae12-3e5417979934.png)
 
 --  
 
