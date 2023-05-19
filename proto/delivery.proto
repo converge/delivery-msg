@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option go_package = "./pb";
+
+service DeliveryService {
+  rpc CreateDelivery (CreateDeliveryRequest) returns (CreateDeliveryResponse) {}
+  rpc UpdateDelivery (UpdateDeliveryRequest) returns (UpdateDeliveryResponse) {}
+}
+
+message CreateDeliveryRequest {
+  string source_address = 1;
+  string destination_address = 2;
+}
+
+message UpdateDeliveryRequest {
+  string tracking_code = 1;
+  statusEnum status = 2;
+}
+
+
+enum statusEnum {
+  CONFIRMED = 0;
+  IN_WAREHOUSE = 1;
+  IN_TRANSPORT = 2;
+  OUT_FOR_DELIVERY = 3;
+  DELIVERED = 4;
+}
+
+message CreateDeliveryResponse {
+  string tracking_code = 1;
+  string source_address = 2;
+  string destination_address = 3;
+  statusEnum status = 4;
+}
+
+message UpdateDeliveryResponse {}
