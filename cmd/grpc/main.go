@@ -2,12 +2,12 @@ package main
 
 import (
 	"database/sql"
-	"delivery-msg"
 	"delivery-msg/config"
 	"delivery-msg/internal/handlers"
 	"delivery-msg/internal/repositories"
 	"delivery-msg/internal/services"
 	"delivery-msg/pb"
+	"delivery-msg/pkg"
 	"github.com/charmbracelet/log"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -36,7 +36,7 @@ func main() {
 	}
 	defer pgConn.Close()
 
-	pgMigrate, err := migrate.New(delivery_msg.MigrationPath, cfg.DatabaseUrl)
+	pgMigrate, err := migrate.New(pkg.MigrationPath, cfg.DatabaseUrl)
 	if err != nil {
 		log.Error(err)
 		return
@@ -47,13 +47,13 @@ func main() {
 	}
 
 	log.Info("gRPC API is running...")
-	listener, err := net.Listen("tcp", delivery_msg.GRPCHostPort)
+	listener, err := net.Listen("tcp", pkg.GRPCHostPort)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	natsConn, err := nats.Connect(delivery_msg.NATSHostPost, nats.UserInfo(cfg.NATSUser, cfg.NATSPassword))
+	natsConn, err := nats.Connect(pkg.NATSHostPost, nats.UserInfo(cfg.NATSUser, cfg.NATSPassword))
 	if err != nil {
 		log.Error(err)
 		return

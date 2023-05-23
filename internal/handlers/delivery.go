@@ -5,7 +5,9 @@ import (
 	"delivery-msg/internal/repositories"
 	"delivery-msg/internal/services"
 	"delivery-msg/pb"
+	"github.com/charmbracelet/log"
 	"github.com/google/uuid"
+	"time"
 )
 
 type DeliveryHandler struct {
@@ -31,11 +33,19 @@ func (deliveryHandler *DeliveryHandler) CreateDelivery(
 ) (*pb.CreateDeliveryResponse, error) {
 
 	trackingCode := uuid.NewString()
-	if err := deliveryHandler.dbRepository.CreateDelivery(in.SourceAddress, in.DestinationAddress, trackingCode); err != nil {
+	now := time.Now().Format("2006-01-02 15:04:05")
+	if err := deliveryHandler.dbRepository.CreateDelivery(in.SourceAddress, in.DestinationAddress, trackingCode, now, now); err != nil {
 		return nil, err
 	}
 
-	err := deliveryHandler.natsClient.Publish(trackingCode, pb.StatusEnum_CONFIRMED)
+	err := deliveryHandler.natsClient.Publish(
+		trackingCode,
+		in.SourceAddress,
+		in.DestinationAddress,
+		pb.StatusEnum_CONFIRMED,
+		now,
+		now,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -53,11 +63,26 @@ func (deliveryHandler *DeliveryHandler) UpdateDelivery(
 	in *pb.UpdateDeliveryRequest,
 ) (*pb.UpdateDeliveryResponse, error) {
 
-	if err := deliveryHandler.dbRepository.UpdateDelivery(in.TrackingCode, in.Status.String()); err != nil {
+	log.Info(in.TrackingCode)
+
+	modified := time.Now().Format("2006-01-02 15:04:05")
+	updatedDelivery, err := deliveryHandler.dbRepository.UpdateDelivery(in.TrackingCode, modified, in.Status.String())
+	if err != nil {
+		log.Error(err)
 		return nil, err
 	}
 
-	err := deliveryHandler.natsClient.Publish(in.TrackingCode, in.GetStatus())
+	// todo: centralize format
+	now := time.Now().Format("2006-01-02 15:04:05")
+
+	err = deliveryHandler.natsClient.Publish(
+		in.TrackingCode,
+		updatedDelivery.SourceAddress,
+		updatedDelivery.DestinationAddress,
+		in.GetStatus(),
+		updatedDelivery.Created,
+		now,
+	)
 	if err != nil {
 		return nil, err
 	}

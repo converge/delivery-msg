@@ -1,7 +1,9 @@
 package services
 
 import (
+	"delivery-msg/internal/domain"
 	"delivery-msg/pb"
+	"encoding/json"
 	"github.com/nats-io/nats.go"
 )
 
@@ -15,9 +17,29 @@ func NewNATSClient(conn *nats.Conn) (NATSClient, error) {
 	}, nil
 }
 
-func (natsClient *NATSClient) Publish(orderId string, status pb.StatusEnum) error {
+func (natsClient *NATSClient) Publish(
+	trackingCode string,
+	sourceAddress string,
+	destinationAddress string,
+	status pb.StatusEnum,
+	created string,
+	modified string,
+) error {
 
-	err := natsClient.Conn.Publish("nats_development", []byte("orderId: "+orderId+" status: "+status.String()))
+	deliveryData := domain.Delivery{
+		TrackingCode:       trackingCode,
+		SourceAddress:      sourceAddress,
+		DestinationAddress: destinationAddress,
+		Status:             status.String(),
+		Created:            created,
+		Modified:           modified,
+	}
+	jsonData, err := json.Marshal(deliveryData)
+	if err != nil {
+		return err
+	}
+
+	err = natsClient.Conn.Publish("nats_development", jsonData)
 	if err != nil {
 		return err
 	}

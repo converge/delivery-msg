@@ -38,7 +38,7 @@ updated.
 
 #### UI/client
 
-- [ ] As a user, I want to have a UI that is subscribed to the delivery topic, and can update the screen based on new
+- [x] As a user, I want to have a UI that is subscribed to the delivery topic, and can update the screen based on new
 messages.
 
 #### implement logging with bubble tea team
@@ -48,3 +48,4 @@ messages.
 
 ### todo:
 - [ ] validate inputs
+- [ ] add code and general documentation
