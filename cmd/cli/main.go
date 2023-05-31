@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"delivery-msg/cmd/cli/ui"
 	"delivery-msg/config"
@@ -22,9 +21,13 @@ import (
 type model struct {
 	table        table.Model
 	sub          *nats.Subscription
-	deliveryData *pkg.DeliveryData
+	deliveryData pkg.DeliveryData
+	newChField   chan pkg.DeliveryData
+	chReceiver   chan *nats.Msg
 	baseStyle    lipgloss.Style
 }
+
+type testingDev *nats.Msg
 
 func fetchData(m *model) (pkg.DeliveryData, error) {
 
@@ -47,56 +50,42 @@ func fetchData(m *model) (pkg.DeliveryData, error) {
 		return nil, err
 	}
 
-	//var rows []table.Row
 	deliveryData, _, err := ui.PopulateInitialData(dbData)
 	if err != nil {
 		return nil, err
 	}
-	//m.deliveryData = new(pkg.DeliveryData)
-	m.deliveryData = &deliveryData
-	//x.data = DeliveryData
+	m.deliveryData = deliveryData
 
 	return deliveryData, nil
 }
 
-func fetchBackground(m *model) tea.Cmd {
-
-	data, err := fetchData(m)
-	if err != nil {
-		fmt.Println(err) // todo:
-	}
-
-	m.deliveryData = &data
+func waitForActivity(newCh chan *nats.Msg) tea.Cmd {
 	return func() tea.Msg {
-		return m.deliveryData
+		return testingDev(<-newCh)
 	}
-
 }
 
 func (m model) Init() tea.Cmd {
-	// this will be called later by bubble tea
-	//return fetchBackground(&m)
-	return nil
+	return tea.Batch(
+		waitForActivity(m.chReceiver),
+	)
 }
 
-func checkForUpdate(m *model, ctx context.Context) error {
+func doUpdate(m *model, natsData *nats.Msg) error {
 
-	//NATSMsg, err := m.sub.NextMsg(60 * time.Second)
-	//fmt.Println("Waiting for message...")
-	NATSMsg, err := m.sub.NextMsgWithContext(ctx)
-	if err != nil {
-		return err
-	}
-	//fmt.Println("done...")
 	var data domain.Delivery
-	err = json.Unmarshal(NATSMsg.Data, &data)
+	err := json.Unmarshal(natsData.Data, &data)
 	if err != nil {
-		return err
+		return nil
 	}
 
-	for k, _ := range *m.deliveryData {
-		if k == data.TrackingCode {
+	for k, v := range *m.deliveryData {
+		if v.TrackingCode == data.TrackingCode {
 			(*m.deliveryData)[k] = data
+			//v.Status = data.Status
+			//v.SourceAddress = data.SourceAddress
+			//v.DestinationAddress = data.DestinationAddress
+			// todo: modified?
 		}
 	}
 
@@ -105,8 +94,8 @@ func checkForUpdate(m *model, ctx context.Context) error {
 	//	return err
 	//}
 	var rows []table.Row
-	for k, v := range *m.deliveryData {
-		rows = append(rows, table.Row{k, v.SourceAddress, v.DestinationAddress, v.Status, v.Created, v.Modified})
+	for _, v := range *m.deliveryData {
+		rows = append(rows, table.Row{v.TrackingCode, v.SourceAddress, v.DestinationAddress, v.Status, v.Created, v.Modified})
 	}
 
 	m.table.SetRows(rows)
@@ -115,30 +104,23 @@ func checkForUpdate(m *model, ctx context.Context) error {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
+
+	case testingDev:
+		err := doUpdate(&m, msg)
+		if err != nil {
+			log.Error(err)
+			return nil, nil
+		}
+		return m, waitForActivity(m.chReceiver)
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
-		case "u":
-			err := checkForUpdate(&m, context.Background())
-			if err != nil {
-				log.Error(err)
-				return nil, nil
-			}
 		}
-		//case *pkg.DeliveryData:
-		//	// todo: fix it
-		//	m.deliveryData = msg
-		//	var rows []table.Row
-		//	for k, v := range *m.deliveryData {
-		//		rows = append(rows, table.Row{k, v.SourceAddress, v.DestinationAddress, v.Status, v.Created, v.Modified})
-		//	}
-		//
-		//	m.table.SetRows(rows)
-		//	time.Sleep(1 * time.Second)
-		//	return m, fetchBackground(&m)
 	}
 
 	m.table, cmd = m.table.Update(msg)
@@ -151,7 +133,9 @@ func (m model) View() string {
 
 func main() {
 
-	m := model{}
+	m := model{
+		newChField: make(chan pkg.DeliveryData),
+	}
 	m.baseStyle = lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240"))
@@ -160,17 +144,17 @@ func main() {
 	t := ui.CreateUITable(rows)
 	m.table = t
 
-	cfg := config.ReadConfig()
-
 	data, err := fetchData(&m)
 	if err != nil {
+		log.Error(err)
 		return
 	}
-	for k, v := range data {
-		rows = append(rows, table.Row{k, v.SourceAddress, v.DestinationAddress, v.Status, v.Created, v.Modified})
+	for _, v := range *data {
+		rows = append(rows, table.Row{v.TrackingCode, v.SourceAddress, v.DestinationAddress, v.Status, v.Created, v.Modified})
 	}
 	m.table.SetRows(rows)
 
+	cfg := config.ReadConfig()
 	nc, err := nats.Connect(pkg.NATSHostPost, nats.UserInfo(cfg.NATSUser, cfg.NATSPassword))
 	if err != nil {
 		log.Error(err)
@@ -178,56 +162,21 @@ func main() {
 	}
 	defer nc.Close()
 
-	m.sub, err = nc.SubscribeSync("nats_development")
+	m.chReceiver = make(chan *nats.Msg, 64)
+	m.sub, err = nc.ChanSubscribe("nats_development", m.chReceiver)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
+	defer func(sub *nats.Subscription) {
+		_, err := sub.Dropped()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(m.sub)
+
 	if _, err = tea.NewProgram(m).Run(); err != nil {
 		fmt.Println("Error running program:", err)
 	}
-	//wg.Done()
-	//ctx.Done()
-	//}()
-
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-ctx.Done():
-	//			break
-	//		default:
-	//			rows, err := checkForUpdate(&m, ctx)
-	//			if err != nil {
-	//				return
-	//			}
-	//			m.table.SetRows(rows)
-	//			time.Sleep(3 * time.Second)
-	//			m.table.UpdateViewport()
-	//		}
-	//	}
-	//}()
-
-	//wg.Wait()
-
-	//// go routine NATS MSG
-	//wg.Add(1)
-	//go func() {
-	//
-	//	defer wg.Done()
-	//
-	//	for {
-	//		select {
-	//		case <-ctx.Done():
-	//			cancel()
-	//		default:
-	//			checkForUpdate(&m, ctx)
-	//			time.Sleep(3 * time.Second)
-	//		}
-	//	}
-	//}()
-	//
-	//<-runningUI
-	//wg.Wait()
-
 }

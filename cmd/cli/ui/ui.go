@@ -24,10 +24,9 @@ import (
 //	formatCreated := created.Format(timeOutputLayout)
 //	formatModified := modified.Format(timeOutputLayout)
 //
-//	for k, v := range *deliveryData {
-//		if v.TrackingCode
-//
-//	}
+//	//for k, v := range *deliveryData {
+//	//	if v.TrackingCode
+//	//}
 //	deliveryData[data.TrackingCode] = domain.Delivery{
 //		SourceAddress:      data.SourceAddress,
 //		DestinationAddress: data.DestinationAddress,
@@ -40,7 +39,8 @@ import (
 
 func PopulateInitialData(dbData []domain.Delivery) (pkg.DeliveryData, []table.Row, error) {
 
-	var deliveryData = make(map[string]domain.Delivery)
+	//var deliveryData = make(map[string]domain.Delivery)
+	var deliveryData []domain.Delivery
 	var rows []table.Row
 
 	for _, v := range dbData {
@@ -56,13 +56,14 @@ func PopulateInitialData(dbData []domain.Delivery) (pkg.DeliveryData, []table.Ro
 		}
 
 		// model data
-		deliveryData[v.TrackingCode] = domain.Delivery{
+		deliveryData = append(deliveryData, domain.Delivery{
+			TrackingCode:       v.TrackingCode,
 			SourceAddress:      v.SourceAddress,
 			DestinationAddress: v.DestinationAddress,
 			Status:             v.Status,
 			Created:            created.Format(pkg.TimeOutputLayout),
 			Modified:           modified.Format(pkg.TimeOutputLayout),
-		}
+		})
 
 		// presentation data
 		rows = append(rows, table.Row{
@@ -75,7 +76,7 @@ func PopulateInitialData(dbData []domain.Delivery) (pkg.DeliveryData, []table.Ro
 		})
 	}
 
-	return deliveryData, rows, nil
+	return &deliveryData, rows, nil
 
 }
 
