@@ -20,6 +20,13 @@ Objective: have a functional gRPC API that create delivery orders and track the 
 
 ![architecture](https://user-images.githubusercontent.com/188671/239596763-68085444-4dde-4cea-ae12-3e5417979934.png)
 
+## Demo
+
+This is a working demo of the project. It shows the UI, the gRPC server, and the message broker microservice. The UI is
+subscribed to the delivery topic, and it updates the screen based on new messages.
+
+![demo](https://user-images.githubusercontent.com/188671/242454670-124c565d-010c-46ab-8c2d-9a7a94c09b7d.gif)
+
 --  
 
 ### User Stories
