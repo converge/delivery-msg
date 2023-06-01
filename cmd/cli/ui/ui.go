@@ -3,82 +3,12 @@ package ui
 import (
 	"delivery-msg/internal/domain"
 	"delivery-msg/pkg"
+	"encoding/json"
 	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"time"
+	"github.com/nats-io/nats.go"
 )
-
-//func UpdateData(deliveryData *pkg.DeliveryData, data domain.Delivery) error {
-//
-//	timeOutputLayout := "02/01/2006 15:04:05"
-//	created, err := time.Parse(time.RFC3339, data.Created)
-//	if err != nil {
-//		return err
-//	}
-//	modified, err := time.Parse("2006-01-02 15:04:05", data.Modified)
-//	if err != nil {
-//		log.Error(err)
-//		return err
-//	}
-//
-//	formatCreated := created.Format(timeOutputLayout)
-//	formatModified := modified.Format(timeOutputLayout)
-//
-//	//for k, v := range *deliveryData {
-//	//	if v.TrackingCode
-//	//}
-//	deliveryData[data.TrackingCode] = domain.Delivery{
-//		SourceAddress:      data.SourceAddress,
-//		DestinationAddress: data.DestinationAddress,
-//		Status:             data.Status,
-//		Created:            formatCreated,
-//		Modified:           formatModified,
-//	}
-//	return nil
-//}
-
-func PopulateInitialData(dbData []domain.Delivery) (pkg.DeliveryData, []table.Row, error) {
-
-	//var deliveryData = make(map[string]domain.Delivery)
-	var deliveryData []domain.Delivery
-	var rows []table.Row
-
-	for _, v := range dbData {
-
-		created, err := time.Parse(time.RFC3339, v.Created)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		modified, err := time.Parse(time.RFC3339, v.Created)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// model data
-		deliveryData = append(deliveryData, domain.Delivery{
-			TrackingCode:       v.TrackingCode,
-			SourceAddress:      v.SourceAddress,
-			DestinationAddress: v.DestinationAddress,
-			Status:             v.Status,
-			Created:            created.Format(pkg.TimeOutputLayout),
-			Modified:           modified.Format(pkg.TimeOutputLayout),
-		})
-
-		// presentation data
-		rows = append(rows, table.Row{
-			v.TrackingCode,
-			v.SourceAddress,
-			v.DestinationAddress,
-			v.Status,
-			created.Format(pkg.TimeOutputLayout),
-			modified.Format(pkg.TimeOutputLayout),
-		})
-	}
-
-	return &deliveryData, rows, nil
-
-}
 
 func CreateUITable(rows []table.Row) table.Model {
 
@@ -109,4 +39,48 @@ func CreateUITable(rows []table.Row) table.Model {
 	t.SetStyles(s)
 
 	return t
+}
+
+func UpdateTable(data *[]domain.Delivery, natsData *nats.Msg) ([]table.Row, error) {
+
+	var newData domain.Delivery
+	err := json.Unmarshal(natsData.Data, &newData)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range *data {
+		if v.TrackingCode == newData.TrackingCode {
+			(*data)[k] = newData
+		}
+	}
+
+	rows, err := TransformDbDataToRows(*data)
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
+}
+
+func TransformDbDataToRows(data []domain.Delivery) ([]table.Row, error) {
+	var rows []table.Row
+	for _, v := range data {
+		rows = append(rows, table.Row{
+			v.TrackingCode,
+			v.SourceAddress,
+			v.DestinationAddress,
+			v.Status,
+			v.Created,
+			v.Modified,
+		})
+	}
+
+	return rows, nil
+}
+
+func WaitForActivity(newCh chan *nats.Msg) tea.Cmd {
+	return func() tea.Msg {
+		return pkg.NatsListener(<-newCh)
+	}
 }

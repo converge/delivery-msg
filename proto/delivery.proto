@@ -17,7 +17,6 @@ message UpdateDeliveryRequest {
   statusEnum status = 2;
 }
 
-
 enum statusEnum {
   CONFIRMED = 0;
   IN_WAREHOUSE = 1;

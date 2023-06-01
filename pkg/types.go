@@ -1,7 +1,9 @@
 package pkg
 
-import "delivery-msg/internal/domain"
+import (
+	"delivery-msg/internal/domain"
+	"github.com/nats-io/nats.go"
+)
 
-type DeliveryData *[]domain.Delivery
-
-//type DeliveryData map[string]domain.Delivery
+type DeliveryData []domain.Delivery
+type NatsListener *nats.Msg

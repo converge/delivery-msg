@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"delivery-msg/internal/domain"
 	"delivery-msg/internal/repositories"
 	"delivery-msg/internal/services"
 	"delivery-msg/pb"
@@ -88,4 +89,14 @@ func (deliveryHandler *DeliveryHandler) UpdateDelivery(
 	}
 
 	return &pb.UpdateDeliveryResponse{}, nil
+}
+
+func (deliveryHandler *DeliveryHandler) GetDelivery() (*[]domain.Delivery, error) {
+
+	dbData, err := deliveryHandler.dbRepository.GetAllDeliveries()
+	if err != nil {
+		return nil, err
+	}
+
+	return &dbData, nil
 }
